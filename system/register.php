@@ -3,9 +3,9 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 require_once 'a_func.php';
-require_once 'password_hash_upgrade.php';
 
-function dd_return($status, $message) {
+function dd_return($status, $message)
+{
     if ($status) {
         $json = ['status' => 'success', 'message' => $message];
         http_response_code(200);
@@ -21,6 +21,10 @@ function dd_return($status, $message) {
 
 header('Content-Type: application/json; charset=utf-8;');
 
+//////////////////////////////////////////////////////////////////////////
+
+header('Content-Type: application/json; charset=utf-8;');
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!isset($_SESSION['id'])) {
         $user_login = $_POST['user'];
@@ -31,7 +35,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $response = $_POST["captcha"];
         $verify = file_get_contents("https://www.google.com/recaptcha/api/siteverify?secret={$secret}&response={$response}");
         $captcha_success = json_decode($verify);
-        
         if ($captcha_success->success == false) {
             dd_return(false, "กรุณายืนยันตัวตน");
         } else if ($captcha_success->success == true) {
@@ -41,19 +44,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     if ($user_login != "" && $pwd_login != "" && $pwd2_login != "" && $_POST['email'] != "") {
                         if (filter_var($_POST['email'], FILTER_VALIDATE_EMAIL)) {
                             if ($pwd_login == $pwd2_login) {
-                                // ใช้ระบบลงทะเบียนที่อัปเกรดแล้ว
-                                $result = registerUser($user_login, $pwd_login, $_POST['email']);
-                                if ($result['status'] == 'success') {
-                                    // Login อัตโนมัติหลังลงทะเบียน
-                                    $user = checkUserPassword($user_login, $pwd_login);
-                                    if ($user) {
-                                        $_SESSION['id'] = $user['id'];
+                                $q = dd_q("SELECT * FROM users WHERE username = ? ", [$_POST['user']]);
+                                if ($q->rowCount() == 1) {
+                                    dd_return(false, "ชื่อนี้ผู้ใช้แล้ว");
+                                } else {
+                                    $in = dd_q("INSERT INTO users (email,username,password,date,point,total,accept) VALUES ( ? , ? , ? , NOW() , 0 , 0 , ? )", [
+                                        $_POST['email'],
+                                        $user_login,
+                                        md5($pwd_login),
+                                        $accept
+                                    ]);
+                                    if ($in == true) {
+                                        $q = dd_q("SELECT * FROM users WHERE username = ? AND password = ? ", [
+                                            $user_login,
+                                            md5($pwd_login)
+                                        ]);
+                                        $dt = $q->fetch(PDO::FETCH_ASSOC);
+                                        $_SESSION['id'] = $dt['id'];
                                         dd_return(true, "สมัครสมาชิกสำเร็จ");
                                     } else {
-                                        dd_return(false, "ลงทะเบียนสำเร็จแต่เข้าสู่ระบบไม่ได้");
+                                        dd_return(false, "ผิดพลาด");
                                     }
-                                } else {
-                                    dd_return(false, $result['message']);
                                 }
                             } else {
                                 dd_return(false, "โปรดป้อนรหัสผ่านทั้งสองให้ตรงกัน");
@@ -70,19 +81,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             } elseif ($config['oaccept'] == 0) {
                 if ($user_login != "" && $pwd_login != "" && $pwd2_login != "") {
                     if ($pwd_login == $pwd2_login) {
-                        // ใช้ระบบลงทะเบียนที่อัปเกรดแล้ว (ไม่มี email)
-                        $result = registerUser($user_login, $pwd_login, null);
-                        if ($result['status'] == 'success') {
-                            // Login อัตโนมัติหลังลงทะเบียน
-                            $user = checkUserPassword($user_login, $pwd_login);
-                            if ($user) {
-                                $_SESSION['id'] = $user['id'];
+                        $q = dd_q("SELECT * FROM users WHERE username = ? ", [$_POST['user']]);
+                        if ($q->rowCount() == 1) {
+                            dd_return(false, "ชื่อนี้ผู้ใช้แล้ว");
+                        } else {
+                            $in = dd_q("INSERT INTO users (username,password,date,point,total,accept) VALUES ( ? , ? , NOW() , 0 , 0 , ? )", [
+                                $user_login,
+                                md5($pwd_login),
+                                $accept
+                            ]);
+                            if ($in == true) {
+                                $q = dd_q("SELECT * FROM users WHERE username = ? AND password = ? ", [
+                                    $user_login,
+                                    md5($pwd_login)
+                                ]);
+                                $dt = $q->fetch(PDO::FETCH_ASSOC);
+                                $_SESSION['id'] = $dt['id'];
                                 dd_return(true, "สมัครสมาชิกสำเร็จ");
                             } else {
-                                dd_return(false, "ลงทะเบียนสำเร็จแต่เข้าสู่ระบบไม่ได้");
+                                dd_return(false, "ผิดพลาด");
                             }
-                        } else {
-                            dd_return(false, $result['message']);
                         }
                     } else {
                         dd_return(false, "โปรดป้อนรหัสผ่านทั้งสองให้ตรงกัน");
@@ -100,4 +118,3 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 dd_return(false, "Method '{$_SERVER['REQUEST_METHOD']}' not allowed!");
-?>

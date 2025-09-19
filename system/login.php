@@ -3,7 +3,6 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 require_once 'a_func.php';
-require_once 'password_hash_upgrade.php';
 
 function dd_return($status, $message) {
     if ($status) {
@@ -26,21 +25,47 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $user_login = $_POST['user'];
     $pwd_login = $_POST['pass'];
 
-    if ($user_login != "" AND $pwd_login != "") {
-        // ใช้ระบบตรวจสอบ password ที่อัปเกรดแล้ว
-        $user = checkUserPassword($user_login, $pwd_login);
-        
-        if ($user) {
-            $_SESSION['id'] = $user['id'];
-            dd_return(true, "เข้าสู่ระบบสำเร็จ");
-        } else {
-            dd_return(false, "ไม่พบผู้ใช้นี้ / รหัสผ่านไม่ถูกต้อง");
+    // $secret = $conf['secretkey'];
+    // $response = $_POST["captcha"];
+    // $verify = file_get_contents("https://www.google.com/recaptcha/api/siteverify?secret={$secret}&response={$response}");
+    // $captcha_success = json_decode($verify);
+    // if ($captcha_success->success==false) {
+    //   dd_return(false, "กรุณายืนยันตัวตน");
+    // }else if ($captcha_success->success==true) {
+//================================================================
+        if ($user_login != "" AND $pwd_login != "") {
+
+                $q = dd_q("SELECT * FROM users WHERE username = ? AND password = ?  ", [
+                    $_POST['user'],
+                    md5($pwd_login)
+                ]);
+                if($q->rowCount() == 1){
+                  $dt = $q->fetch(PDO::FETCH_ASSOC);
+                  $_SESSION['id'] = $dt['id'];
+                  dd_return(true, "เข้าสู่ระบบสำเร็จ");
+                  
+                }else{
+                  $q = dd_q("SELECT * FROM users WHERE username = ? AND password = ?  ", [
+                      $_POST['user'],
+                      $password = hash("sha256", hash("sha256", $pwd_login))
+                  ]);
+                  if($q->rowCount() == 1){
+                    $dt = $q->fetch(PDO::FETCH_ASSOC);
+                    $_SESSION['id'] = $dt['id'];
+                    dd_return(true, "เข้าสู่ระบบสำเร็จ");
+                  }else{
+                    dd_return(false, "ไม่พบผู้ใช้นี้ / รหัสผ่านไม่ถูกต้อง");
+                  }
+                }
+
         }
+            dd_return(false, "กรุณากรอกข้อมูลให้ครบ");
+//================================================================
+      }else{
+        dd_return(false, "ไม่สามารถใช้งานได้");
+      }
     }
-    dd_return(false, "กรุณากรอกข้อมูลให้ครบ");
-  } else {
-    dd_return(false, "ไม่สามารถใช้งานได้");
-  }
-}
-dd_return(false, "ออกจากระบบก่อน");
-?>
+  dd_return(false, "ออกจากระบบก่อน");
+// }
+dd_return(false, "Method '{$_SERVER['REQUEST_METHOD']}' not allowed!");
+ ?>
