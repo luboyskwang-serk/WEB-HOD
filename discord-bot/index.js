@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { connectToDatabase } = require('./database');
 const logger = require('./utils/logger');
+const WebhookSystem = require('./monitoring/webhooks');
 
 // Initialize Discord Client
 const client = new Client({
@@ -30,6 +31,9 @@ async function initializeBot() {
     // Connect to database
     database = await connectToDatabase();
     logger.info('Connected to database successfully');
+
+    // Initialize webhook system
+    client.webhookSystem = new WebhookSystem();
 
     // Load command files
     const commandsPath = path.join(__dirname, 'commands');
